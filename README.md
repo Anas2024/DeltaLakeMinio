@@ -59,10 +59,10 @@ README.md
    accessKey: 'Your Minio Access Key'
    secretKey: 'Your Minio secret key'
    
-4. Build the Docker image: docker build -t deltaLakeMinio .
+4. Build the Docker image: docker build -t deltalakeminio .
    Note: We have provided a Dockerfile for building the Docker image
 
-5. Run the Docker container: docker run --rm -p 8080:8080 -it deltaLakeMinio:latest 
+5. Run the Docker container: docker run --rm -p 8080:8080 -it deltalakeminio:latest 
    
 6. Access the Swagger UI by navigating to http://localhost:8080/swagger-ui/index.html
 

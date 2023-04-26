@@ -15,7 +15,7 @@ LABEL description="Deltalake V1"
 WORKDIR /app
 COPY --from=build /home/app/target/deltalake-spark-minio.jar /app/deltalake-spark-minio.jar
 EXPOSE 8080
-RUN adduser --uid 1001 --disabled-password --gecos "" appuser
+RUN adduser --disabled-password --gecos "" appuser
 USER appuser
 CMD ["java", "-jar", "/app/deltalake-spark-minio.jar"]
 
