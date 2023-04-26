@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+delta:
+  tables:
+    ShopUserTransactionPath: s3a://delta/analysis/shop_user_transaction/
+
+spark:
+  cluster:
+    URL: local[*]
+  maxSparkSessionInstances: 10
+s3a:
+  URL: http://localhost:9000
+  accessKey: 6rRClv8icafhSrwg
+  secretKey: mEZSkuBOLbYYUNzatUlOed76yVBzjL0y
+
+
+management:
+  server:
+    port: 9095
+  security:
+    enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: "*"
