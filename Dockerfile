@@ -8,14 +8,12 @@ RUN mvn -B clean package
 
 # Package stage #
 FROM openjdk:17-jdk
-ENV JAVA_TOOL_OPTIONS="--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports java.base/sun.util.calendar=ALL-UNNAMED"
+ENV JAVA_TOOL_OPTIONS="--add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-exports=java.base/sun.util.calendar=ALL-UNNAMED"
 LABEL maintainer="Anas AIT RAHO <anas.aitraho@gmail.com>"
 LABEL version="1.0"
 LABEL description="Deltalake V1"
 WORKDIR /app
 COPY --from=build /home/app/target/deltalake-spark-minio.jar /app/deltalake-spark-minio.jar
 EXPOSE 8080
-RUN adduser --disabled-password --gecos "" appuser
-USER appuser
 CMD ["java", "-jar", "/app/deltalake-spark-minio.jar"]
 
