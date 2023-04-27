@@ -8,8 +8,9 @@ import java.util.List;
 
 public interface ShopUserTransactionService
 {
-    List<ShopUserTransaction> insertData();
+    void insertData(Integer numberOfData);
     List<ShopUserTransaction> getAllShopUsersTransaction();
+    List<ShopUserTransaction> getShopUsersTransaction(Integer limit);
     List<ShopUserTransaction> getShopUserTransactionByShopId(Long shopId);
     ShopUserTransaction createShopUserTransaction(ShopUserTransactionDTO shopUserTransactionDTO);
     ShopUserTransaction updateShopUserTransactionByShopId(Long shopId, ShopUserTransactionDTO shopUserTransactionDTO);

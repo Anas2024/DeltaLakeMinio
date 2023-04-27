@@ -11,8 +11,8 @@ spark:
   maxSparkSessionInstances: 10
 s3a:
   URL: http://localhost:9000
-  accessKey: 6rRClv8icafhSrwg
-  secretKey: mEZSkuBOLbYYUNzatUlOed76yVBzjL0y
+  accessKey: cUvuW91maGUzCPVc
+  secretKey: CcVrQbQS5u90fsTaXDnpWgFOBq6cS9lE
 
 
 management:
@@ -24,3 +24,6 @@ management:
     web:
       exposure:
         include: "*"
+springdoc:
+  swagger-ui:
+    operationsSorter: method

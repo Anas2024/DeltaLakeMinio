@@ -2,6 +2,7 @@ package com.izycap.deltalake;
 
 import com.izycap.deltalake.config.SparkSessionPool;
 import com.izycap.deltalake.entities.ShopUserTransaction;
+import com.izycap.deltalake.service.ShopUserTransactionService;
 import io.delta.tables.DeltaTable;
 import io.delta.tables.DeltaTableBuilder;
 import org.apache.spark.sql.SparkSession;

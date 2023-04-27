@@ -43,8 +43,9 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
 
     @Override
     @Transactional
-    public List<ShopUserTransaction> insertData()
+    public void insertData(Integer numberOfData)
     {
+        Integer rowNumber = numberOfData != null ? numberOfData : 100;
         SparkSession sparkSession = null;
         try {
             sparkSession = sparkSessionPool.borrowSparkSession();
@@ -53,7 +54,7 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             Dataset<Row> deltaDF = sparkSession.read().format("delta").load(shopUserTransactionPath);
             Object maxIdObj = deltaDF.agg(functions.max("shop_id")).head().get(0);
             Long maxId = maxIdObj != null ? ((Long) maxIdObj) : 0;
-            for (long i = ++maxId; i < (maxId+100); i++) {
+            for (long i = ++maxId; i < (maxId+rowNumber); i++) {
                 Long shop_id = i;
                 String unique_id = "UID_" + i;
                 String card_token = (rand.nextBoolean()) ? "CARD_" + i : null;
@@ -78,7 +79,7 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             }
             Dataset<ShopUserTransaction> dataset = sparkSession.createDataset(deltaLakeData, Encoders.bean(ShopUserTransaction.class));
             dataset.withColumn("amount", col("amount").cast(DataTypes.createDecimalType(10, 2))).write().format("delta").mode("append").save(shopUserTransactionPath);
-            return dataset.collectAsList();
+            //return dataset.collectAsList();
         } catch (Exception e) {
             log.error("Failed to write data to Delta table 'shop_user_transaction'", e);
             throw new RuntimeException("Failed to write data to Delta table 'shop_user_transaction'", e);
@@ -98,6 +99,26 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             sparkSession = sparkSessionPool.borrowSparkSession();
             // Load data from a file
             Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath);
+            Dataset<ShopUserTransaction> shopTransactions = df.as(Encoders.bean(ShopUserTransaction.class));
+            return shopTransactions.collectAsList();
+        } catch (Exception e) {
+            log.error("Failed to load data from Delta table 'shop_user_transaction'", e);
+            throw new RuntimeException("Failed to load data from Delta table 'shop_user_transaction'", e);
+        } finally {
+            if (sparkSession != null) {
+                sparkSessionPool.returnSparkSession(sparkSession);
+            }
+        }
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUsersTransaction(Integer limit) {
+        SparkSession sparkSession = null;
+        try {
+            Integer rowLimit = limit != null ? limit : 100;
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            // Load data from a file
+            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath).limit(rowLimit);
             Dataset<ShopUserTransaction> shopTransactions = df.as(Encoders.bean(ShopUserTransaction.class));
             return shopTransactions.collectAsList();
         } catch (Exception e) {
@@ -143,7 +164,7 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             ShopUserTransaction shopUserTransaction = ModelMapperUtils.convertClass(shopUserTransactionDTO, ShopUserTransaction.class);
             shopUserTransaction.setShop_id(newId);
             Dataset<ShopUserTransaction> shopUserTransactionDf = sparkSession.createDataset(Collections.singletonList(shopUserTransaction), Encoders.bean(ShopUserTransaction.class));
-            shopUserTransactionDf.write().format("delta").mode("append").save(shopUserTransactionPath);
+            shopUserTransactionDf.withColumn("amount", col("amount").cast(DataTypes.createDecimalType(10, 2))).write().format("delta").mode("append").save(shopUserTransactionPath);
             return shopUserTransaction;
         } catch (Exception e) {
             log.error("Failed to write data to Delta table 'shop_user_transaction'", e);
