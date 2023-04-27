@@ -18,7 +18,7 @@ README.md
                         -We will also use Minio to simulate Amason S3 environment and to store Data.
                         -We will also manage a pool of SparkSession instances with configurating class 'SparkSessionPool.java'
 ```
-##Instructions to run the code:
+##Instructions to run application:
 ### Installing Minio:
 ```sh
 1. Install Minio docker image and run the image:
@@ -51,13 +51,14 @@ README.md
 
 ### Clonning the repository && Running Micro service:
 ```sh
-1. Clone the Git repository: git clone ''
+1. Clone the Git repository: git clone 'https://github.com/Anas2024/deltaLakeMinio.git'
 
 2. Navigate to the project directory: cd deltaLakeMinio
 
 3. Navigate to application.properties and modify values of properties: (remember we already create Access Key and Secret Key in 'step 7' of 'Installing Minio')
    accessKey: 'Your Minio Access Key'
    secretKey: 'Your Minio secret key'
+   URL: http://localhost:9000         (change localhost with IP Address of the localmachine where you run Minio)
    
 4. Build the Docker image: docker build -t deltalakeminio .
    Note: We have provided a Dockerfile for building the Docker image
@@ -67,13 +68,14 @@ README.md
 6. Access the Swagger UI by navigating to http://localhost:8080/swagger-ui/index.html
 
 7. Execute this endpoint http://localhost:8080/swagger-ui/index.html#/shop-user-transaction-controller/insertData to insert Data Minio delta bucket
-   NB: Every time you execute this endpoint you insert 100 random row in delta Minio bucket
+   NB: Every time you execute this endpoint you insert by default 100 random rows in delta Minio bucket. 
+       You can change number of rows to insert by changing the value of parameter 'numberOfRow'.
 8. You can now use others CRUD endpoints(GET, POST, PUT, DELETE)
 
 9. If you want to test the application on IDE intellij or eclipse you must Run configuration and add this line without quotes 
    '--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports java.base/sun.util.calendar=ALL-UNNAMED' on VM options like on the picture :
 ```
-![alt text](./images/img6.png)
+![alt text](./images/img7.png)
 
 ### Dockerfile
 
