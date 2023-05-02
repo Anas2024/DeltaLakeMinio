@@ -67,12 +67,12 @@ README.md
    
 6. Access the Swagger UI by navigating to http://localhost:8080/swagger-ui/index.html
 
-7. Execute this endpoint http://localhost:8080/swagger-ui/index.html#/shop-user-transaction-controller/insertData to insert Data Minio delta bucket
+7. Execute this endpoint http://localhost:8080/swagger-ui/index.html#/shop-user-transaction-controller/insertData to insert Data in Minio delta bucket
    NB: Every time you execute this endpoint you insert by default 100 random rows in delta Minio bucket. 
        You can change number of rows to insert by changing the value of parameter 'numberOfRow'.
 8. You can now use others CRUD endpoints(GET, POST, PUT, DELETE)
 
-9. If you want to test the application on IDE intellij or eclipse you must Run configuration and add this line without quotes 
+9. If you want to test the application on IDE intellij or eclipse you must edit 'Run configuration' and add this line without quotes 
    '--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports java.base/sun.util.calendar=ALL-UNNAMED' on VM options like on the picture :
 ```
 ![alt text](./images/img7.png)
