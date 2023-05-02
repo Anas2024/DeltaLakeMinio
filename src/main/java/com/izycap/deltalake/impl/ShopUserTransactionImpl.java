@@ -14,9 +14,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.types.DataTypes;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import scala.collection.immutable.Map;
 
 import java.sql.Timestamp;
 import java.text.ParseException;
@@ -30,6 +32,7 @@ import static org.apache.spark.sql.functions.col;
 
 @Slf4j
 @Service
+@Qualifier("ShopUserTransactionImpl")
 public class ShopUserTransactionImpl implements ShopUserTransactionService {
     private final SparkSessionPool sparkSessionPool;
     @Value("${delta.tables.ShopUserTransactionPath}")
@@ -118,7 +121,7 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             Integer rowLimit = limit != null ? limit : 100;
             sparkSession = sparkSessionPool.borrowSparkSession();
             // Load data from a file
-            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath).limit(rowLimit);
+            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath).limit(rowLimit).cache();
             Dataset<ShopUserTransaction> shopTransactions = df.as(Encoders.bean(ShopUserTransaction.class));
             return shopTransactions.collectAsList();
         } catch (Exception e) {
@@ -130,6 +133,105 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             }
         }
     }
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUsersTransaction(int limit, int pageNumber, int resultsPerPage) {
+        SparkSession sparkSession = null;
+        try {
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            // Load data from a file
+            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath).limit(limit).cache();
+            Dataset<ShopUserTransaction> shopTransactions = df.as(Encoders.bean(ShopUserTransaction.class));
+            List<ShopUserTransaction> transactions = shopTransactions.collectAsList();
+            int maxOffset = Math.max(0, transactions.size() - resultsPerPage);
+            int offset = (pageNumber - 1) * resultsPerPage > maxOffset ? maxOffset : (pageNumber - 1) * resultsPerPage;
+            return transactions.subList(offset, Math.min(transactions.size(), offset + resultsPerPage));
+        } catch (Exception e) {
+            log.error("Failed to load data from Delta table 'shop_user_transaction'", e);
+            throw new RuntimeException("Failed to load data from Delta table 'shop_user_transaction'", e);
+        } finally {
+            if (sparkSession != null) {
+                sparkSessionPool.returnSparkSession(sparkSession);
+            }
+        }
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUsersTransaction(int pageNumber, int resultsPerPage) {
+
+        SparkSession sparkSession = null;
+        try {
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            // Chargement des données à partir d'un fichier
+            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath);
+
+            // Ajout d'un index aux données
+            df = df.withColumn("index", org.apache.spark.sql.functions.monotonically_increasing_id());
+
+            // Définition de l'index de départ et du nombre de lignes à récupérer
+            int startFrom = (pageNumber - 1) * resultsPerPage;
+            int limit = resultsPerPage;
+
+            // Vérification de l'index de départ et du nombre de lignes à récupérer
+            int startIndex = Math.min((int)df.count(), startFrom);
+
+            // Sélection des données à partir de l'index de départ et du nombre de lignes à récupérer
+            df = df.filter(col("index").geq(startIndex)).limit(limit);
+
+            // Suppression de la colonne index
+            df = df.drop("index");
+
+            // Conversion du DataFrame en une liste d'objets ShopUserTransaction
+            List<ShopUserTransaction> transactions = df.as(Encoders.bean(ShopUserTransaction.class)).collectAsList();
+            return transactions;
+        } catch (Exception e) {
+                log.error("Failed to load data from Delta table 'shop_user_transaction'", e);
+                throw new RuntimeException("Failed to load data from Delta table 'shop_user_transaction'", e);
+            } finally {
+                if (sparkSession != null) {
+                    sparkSessionPool.returnSparkSession(sparkSession);
+                }
+            }
+
+    }
+
+   /*
+   @Override
+    @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUsersTransaction(int pageSize, int pageNumber) {
+        SparkSession sparkSession = null;
+        try {
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            // Load data from a file
+            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath);
+            Dataset<ShopUserTransaction> shopTransactions = df.as(Encoders.bean(ShopUserTransaction.class));
+
+            // Define the window specification
+            WindowSpec window = Window.orderBy("shop_id");
+
+            // Define the start and end rows for the page
+            int startRow = (pageNumber - 1) * pageSize + 1;
+            int endRow = pageNumber * pageSize;
+
+            // Add row number to the dataset
+            Dataset<Row> shopTransactionsWithRowNum = shopTransactions.withColumn("row_num", org.apache.spark.sql.functions.row_number().over(window));
+
+            // Filter the dataset to include only the rows for the current page
+            Dataset<Row> pageData = shopTransactionsWithRowNum.filter(col("row_num").between(startRow, endRow));
+
+            // Convert the dataset back to a list of ShopUserTransaction objects
+            List<ShopUserTransaction> transactions = pageData.drop("row_num").dropDuplicates().as(Encoders.bean(ShopUserTransaction.class)).collectAsList();
+
+            return transactions;
+        } catch (Exception e) {
+            log.error("Failed to load data from Delta table 'shop_user_transaction'", e);
+            throw new RuntimeException("Failed to load data from Delta table 'shop_user_transaction'", e);
+        } finally {
+            if (sparkSession != null) {
+                sparkSessionPool.returnSparkSession(sparkSession);
+            }
+        }
+    }*/
 
     @Override
     @Transactional(readOnly = true)
@@ -137,9 +239,7 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
         SparkSession sparkSession = null;
         try {
             sparkSession = sparkSessionPool.borrowSparkSession();
-            // Load data from a file
-            Dataset<Row> df = sparkSession.read().format("delta").load(shopUserTransactionPath);
-            Dataset<ShopUserTransaction> shopTransactions = df.filter(col("shop_id").equalTo(shopId)).as(Encoders.bean(ShopUserTransaction.class));
+            Dataset<ShopUserTransaction> shopTransactions = sparkSession.read().format("delta").load(shopUserTransactionPath).filter(col("shop_id").equalTo(shopId)).as(Encoders.bean(ShopUserTransaction.class));
             return shopTransactions.collectAsList();
         } catch (Exception e) {
             log.error("Failed to load data from Delta table 'shop_user_transaction'", e);
@@ -178,12 +278,12 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
 
     @Override
     @Transactional
-    public ShopUserTransaction updateShopUserTransactionByShopId(Long shopId, ShopUserTransactionDTO ShopUserTransactionDTO) {
+    public ShopUserTransaction updateShopUserTransactionByShopId(Long shopId, ShopUserTransactionDTO shopUserTransactionDTO) {
         SparkSession sparkSession = null;
         try {
             sparkSession = sparkSessionPool.borrowSparkSession();
             DeltaTable deltaTable = DeltaTable.forPath(sparkSession, shopUserTransactionPath);
-            ShopUserTransaction shopUserTransaction = ModelMapperUtils.convertClass(ShopUserTransactionDTO, ShopUserTransaction.class);
+            ShopUserTransaction shopUserTransaction = ModelMapperUtils.convertClass(shopUserTransactionDTO, ShopUserTransaction.class);
             shopUserTransaction.setShop_id(shopId);
             Dataset<Row> shopUserTransactionDF = sparkSession.createDataFrame(Collections.singletonList(shopUserTransaction), ShopUserTransaction.class);
             deltaTable.alias("shopUserTransaction")
@@ -204,6 +304,7 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
         }
     }
 
+
     @Override
     @Transactional
     public void deleteShopUserTransactionByShopId(Long shopId) {
@@ -222,7 +323,6 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
                 sparkSessionPool.returnSparkSession(sparkSession);
             }
         }
-
     }
 
     @Override
@@ -273,6 +373,61 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUserTransactionsByVersionBeforeOrAtTimestamp(String date, int limit, int pageNumber, int resultsPerPage) throws ParseException {
+
+        SparkSession sparkSession = null;
+        try {
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            DeltaLog log = DeltaLog.forTable(new Configuration(), shopUserTransactionPath);
+            long Timestamp = DateUtil.convertStringDateToLong(date);
+            long snapshotVersion = log.getVersionBeforeOrAtTimestamp(Timestamp);
+            Dataset<ShopUserTransaction> shopTransactions = sparkSession.read().format("delta").option("versionAsOf", snapshotVersion).load(shopUserTransactionPath).limit(limit).as(Encoders.bean(ShopUserTransaction.class)).cache();
+            List<ShopUserTransaction> transactions = shopTransactions.collectAsList();
+            int maxOffset = Math.max(0, transactions.size() - resultsPerPage);
+            int offset = (pageNumber - 1) * resultsPerPage > maxOffset ? maxOffset : (pageNumber - 1) * resultsPerPage;
+            return transactions.subList(offset, Math.min(transactions.size(), offset + resultsPerPage));
+        } catch (ParseException e) {
+            log.error("Error parsing date: " + date, e);
+            throw new RuntimeException("Error parsing date: " + date, e);
+        } catch (Exception e) {
+            log.error("Error getting shopUserTransactions by version before or at timestamp: " + e.getMessage(), e);
+            throw new RuntimeException("Error getting shopUserTransactions by version before or at timestamp: ", e);
+        } finally {
+            if (sparkSession != null) {
+                sparkSessionPool.returnSparkSession(sparkSession);
+            }
+        }
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUserTransactionsByVersionAfterOrAtTimestamp(String date, int limit, int pageNumber, int resultsPerPage) throws ParseException {
+
+        SparkSession sparkSession = null;
+        try {
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            DeltaLog log = DeltaLog.forTable(new Configuration(), shopUserTransactionPath);
+            long Timestamp = DateUtil.convertStringDateToLong(date);
+            long snapshotVersion = log.getVersionAtOrAfterTimestamp(Timestamp);
+            Dataset<ShopUserTransaction> shopTransactions = sparkSession.read().format("delta").option("versionAsOf", snapshotVersion).load(shopUserTransactionPath).limit(limit).as(Encoders.bean(ShopUserTransaction.class)).cache();
+            List<ShopUserTransaction> transactions = shopTransactions.collectAsList();
+            int maxOffset = Math.max(0, transactions.size() - resultsPerPage);
+            int offset = (pageNumber - 1) * resultsPerPage > maxOffset ? maxOffset : (pageNumber - 1) * resultsPerPage;
+            return transactions.subList(offset, Math.min(transactions.size(), offset + resultsPerPage));
+        } catch (ParseException e) {
+            log.error("Error parsing date: " + date, e);
+            throw new RuntimeException("Error parsing date: " + date, e);
+        } catch (Exception e) {
+            log.error("Error getting shopUserTransactions by version before or at timestamp: " + e.getMessage(), e);
+            throw new RuntimeException("Error getting shopUserTransactions by version before or at timestamp: ", e);
+        } finally {
+            if (sparkSession != null) {
+                sparkSessionPool.returnSparkSession(sparkSession);
+            }
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ShopUserTransaction> getShopUserTransactionsByVersionAfterOrAtTimestamp(String date) throws ParseException {
 
         SparkSession sparkSession = null;
@@ -307,12 +462,33 @@ public class ShopUserTransactionImpl implements ShopUserTransactionService {
             return df.collectAsList();
         } catch (Exception e) {
             log.error("Error getting shopUserTransactions by version: " + e.getMessage(), e);
+            throw new RuntimeException("Error getting shopUserTransactions by version: ", e);
         } finally {
             if (sparkSession != null) {
                 sparkSessionPool.returnSparkSession(sparkSession);
             }
         }
-        return Collections.emptyList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShopUserTransaction> getShopUserTransactionsBySnapshotVersion(Integer version, int limit, int pageNumber, int resultsPerPage)
+    {
+        SparkSession sparkSession = null;
+        try {
+            sparkSession = sparkSessionPool.borrowSparkSession();
+            Dataset<ShopUserTransaction> shopTransactions = sparkSession.read().format("delta").option("versionAsOf", version).load(shopUserTransactionPath).limit(limit).as(Encoders.bean(ShopUserTransaction.class)).cache();
+            List<ShopUserTransaction> transactions = shopTransactions.collectAsList();
+            int maxOffset = Math.max(0, transactions.size() - resultsPerPage);
+            int offset = (pageNumber - 1) * resultsPerPage > maxOffset ? maxOffset : (pageNumber - 1) * resultsPerPage;
+            return transactions.subList(offset, Math.min(transactions.size(), offset + resultsPerPage));
+        } catch (Exception e) {
+            log.error("Error getting shopUserTransactions by version: " + e.getMessage(), e);
+            throw new RuntimeException("Error getting shopUserTransactions by version: ", e);
+        } finally {
+            if (sparkSession != null) {
+                sparkSessionPool.returnSparkSession(sparkSession);
+            }
+        }
+    }
 }

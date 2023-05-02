@@ -138,7 +138,7 @@ Note:  This example uses a multi-stage build. The first stage is used to build t
 
 ### Actuator
 ```sh
-Actuator run on port 9095, to acces to actuator endpoints use http://localhost:9000/actuator
+Actuator run on port 9095, to acces to actuator endpoints use http://localhost:9095/actuator
 Example:  http://localhost:9095/actuator/health
 ```
 
